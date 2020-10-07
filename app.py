@@ -119,24 +119,26 @@ def node_post():
 
 
 def node_put(id):
-    """Update or Create a node
+    """Update or create a node.
     In this demo, there is no provision for updating the Postgres sequence id if records are created here.
     :return: The entire graph
     """
     # Get the data in the request (cleaned to prevent XSS)
     try:
-        name = clean(request.json.get('name') or '') or None
-        color = clean(request.json.get('_color') or '') or None
         # Check whether the node exists
         node = db.session.query(Node).filter_by(id=id).first()
         if node:
-            # Update the node with data (which has been cleaned to prevent XSS)
-            node.name = name
-            node.color = color
+            # Update only the parameters provided in the request data
+            if 'name' in request.json:
+                node.name = clean(request.json.get('name') or '') or None
+            if '_color' in request.json:
+                node.color = clean(request.json.get('_color') or '') or None
             db.session.commit()
             return graph(), 200
         else:
             # Create the node
+            name = clean(request.json.get('name') or '') or None
+            color = clean(request.json.get('_color') or '') or None
             node = Node(id=id, name=name, color=color)
             db.session.add(node)
             db.session.commit()
@@ -207,22 +209,29 @@ def edge_put(id):
     """
     # Get the data in the request (cleaned to prevent XSS)
     try:
-        sid = request.json.get('sid')
-        tid = request.json.get('tid')
-        name = clean(request.json.get('name') or '') or None
-        color = clean(request.json.get('_color') or '') or None
         # Check whether the edge exists
         edge = db.session.query(Edge).filter_by(id=id).first()
         if edge:
-            # Update the edge with data (which has been cleaned to prevent XSS)
-            edge.sid = sid
-            edge.tid = tid
-            edge.name = name
-            edge.color = color
+            # Update only the parameters provided in the request data
+            if 'sid' in request.json and isinstance(request.json['sid'], int):
+                edge.sid = request.json['sid']
+            if 'tid' in request.json and isinstance(request.json['tid'], int):
+                edge.tid = request.json['tid']
+            if 'name' in request.json:
+                edge.name = clean(request.json.get('name') or '') or None
+            if '_color' in request.json:
+                edge.color = clean(request.json.get('_color') or '') or None
             db.session.commit()
             return graph(), 200
         else:
             # Create the edge
+            if isinstance(request.json.get('sid'), int) and isinstance(request.json.get('tid'), int):
+                sid = request.json['sid']
+                tid = request.json['tid']
+            else:
+                return 'Sorry, the sid and tid params must be integers.', 400
+            name = clean(request.json.get('name') or '') or None
+            color = clean(request.json.get('_color') or '') or None
             edge = Edge(id=id, sid=sid, tid=tid, name=name, color=color)
             db.session.add(edge)
             db.session.commit()

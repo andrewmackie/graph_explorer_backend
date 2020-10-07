@@ -78,6 +78,24 @@ def test_node_put(client):
            updated_node['_color'] == color
 
 
+def test_node_put_partial_1(client):
+    existing_node_data = client.get('/api/v0/node/1').json
+    response = client.put('/api/v0/node/1', json={'name': name})
+    updated_node = return_item_with_id(response.json['nodes'], 1)
+    assert response.status_code == 200 and \
+           updated_node['name'] == name and \
+           updated_node['_color'] == existing_node_data['_color']
+
+
+def test_node_put_partial_2(client):
+    existing_node_data = client.get('/api/v0/node/1').json
+    response = client.put('/api/v0/node/1', json={'_color': color})
+    updated_node = return_item_with_id(response.json['nodes'], 1)
+    assert response.status_code == 200 and \
+           updated_node['name'] == existing_node_data['name'] and \
+           updated_node['_color'] == color
+
+
 def test_node_delete(client):
     response = client.delete('/api/v0/node/1')
     assert response.status_code == 200 and \
@@ -113,6 +131,28 @@ def test_edge_put(client):
            updated_edge['sid'] == sid and \
            updated_edge['tid'] == tid and \
            updated_edge['name'] == name and \
+           updated_edge['_color'] == color
+
+
+def test_edge_put_partial_1(client):
+    existing_edge_data = client.get('/api/v0/edge/1').json
+    response = client.put('/api/v0/edge/1', json={'sid': sid, 'name': name})
+    updated_edge = return_item_with_id(response.json['edges'], 1)
+    assert response.status_code == 200 and \
+           updated_edge['sid'] == sid and \
+           updated_edge['tid'] == existing_edge_data['tid'] and \
+           updated_edge['name'] == name and \
+           updated_edge['_color'] == existing_edge_data['_color']
+
+
+def test_edge_put_partial_2(client):
+    existing_node_data = client.get('/api/v0/edge/1').json
+    response = client.put('/api/v0/edge/1', json={'tid': tid, '_color': color})
+    updated_edge = return_item_with_id(response.json['edges'], 1)
+    assert response.status_code == 200 and \
+           updated_edge['sid'] == existing_node_data['sid'] and \
+           updated_edge['tid'] == tid and \
+           updated_edge['name'] == existing_node_data['name'] and \
            updated_edge['_color'] == color
 
 
