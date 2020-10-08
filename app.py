@@ -1,16 +1,103 @@
 """A RESTful CRUD API for a graph with endpoints for nodes and edges"""
 
 from bleach import clean
+from flasgger import Swagger
 from flask import Flask, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 import os
 from sqlalchemy.schema import CheckConstraint
 
-
 app = Flask(__name__)
-# Allow CORS for all routes
-CORS(app)
+
+# Use flasgger to automatically render and serve OpenAPI documentation (from comments in each route)
+# Create an APISpec
+template = {
+    'title': 'Graph Explorer REST API',
+    'description': 'A REST API for a graph of nodes and edges.',
+    'version': '0',
+    'contact': {
+      'name': 'Andrew Mackie',
+    },
+    'headers': [
+        ('Access-Control-Allow-Origin', '*'),
+        ('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS'),
+        ('Access-Control-Allow-Credentials', 'true'),
+    ],
+    'components': {
+        'schemas': {
+            'Node': {
+                'type': 'object',
+                'properties': {
+                    'id': {
+                        'type': 'integer',
+                        'required': True,
+                        'description': 'The unique identifier for this node'
+                    },
+                    'name': {
+                        'type': 'string',
+                        'default': None,
+                        'required': False,
+                        'unique': True,
+                        'description': 'An optional and unique string to describe this node'
+                    },
+                    '_color': {
+                        'type': 'string',
+                        'default': None,
+                        'required': False,
+                        'description': "An optional hex color for this node, including the # character (e.g. '#09A2d2')"
+                    },
+
+                }
+            },
+            'Edge': {
+                'type': 'object',
+                'properties': {
+                    'id': {
+                        'type': 'integer',
+                        'required': True,
+                        'description': 'The unique identifier for this node'
+                    },
+                    'sid': {
+                        'type': 'integer',
+                        'required': True,
+                        'description': 'The id of the source node (the first node connected by this edge)'
+                    },
+                    'tid': {
+                        'type': 'integer',
+                        'required': True,
+                        'description': 'The id of the target node (the second node connected by this edge)'
+                    },
+                    'name': {
+                        'type': 'string',
+                        'default': None,
+                        'required': False,
+                        'unique': True,
+                        'description': 'An optional and unique string to describe this edge'
+                    },
+                    '_color': {
+                        'type': 'string',
+                        'default': None,
+                        'required': False,
+                        'description': "An optional hex color for this edge, including the # character (e.g. '#09A2d2')"
+                    },
+
+                }
+            }
+        }
+    }
+}
+
+# swagger config
+app.config['SWAGGER'] = {
+    'title': 'Graph Explorer API',
+    'uiversion': 3,
+    "specs_route": "/apidocs/"
+}
+
+swagger = Swagger(app, template= template)
+
+CORS(app)  # Allow all CORS origins for all routes
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = 'False'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 db = SQLAlchemy(app)
@@ -53,7 +140,7 @@ class Edge(db.Model):
 
 @app.route('/')
 def welcome():
-    return 'Welcome to graph explorer!'
+    return '<p>Welcome to Graph Explorer!</p><p>View the  <a href="/apidocs">API documentation</a>'
 
 
 '''
@@ -61,7 +148,7 @@ The API has a wrapper which defines the Flask route and identifies the noun and 
 The wrapper then allocates the request to the appropriate function (for the noun and method).
 This architecture allows these unit-tested functions to be reused by other routes in the future.
 '''
-def graph():
+def get_graph():
     """Return the entire graph in the format required by vue-d3 network in the frontend."""
     return {
         'nodes': [{'id': r.id, 'name': r.name, '_color': r.color} for r in db.session.query(Node).all()],
@@ -72,14 +159,23 @@ def graph():
     }
 
 
-@app.route('/graph')
 @app.route('/api/v0/graph')
-def return_graph():
-    """An endpoint for graph()"""
+def graph():
+    """Returns the entire graph of nodes and edges
+    ---
+    definitions:
+      Node:
+          $ref: '#/components/schemas/Node'
+      Edge:
+          $ref: '#/components/schemas/Edge'
+    responses:
+      200:
+        description: Returns the entire graph (all nodes and all edges in the database)
+    """
     if request.method == 'OPTIONS':
         # This is a CORS preflight request
         return {}, 200
-    return graph(), 200
+    return get_graph(), 200
 
 
 def node_get(id):
@@ -113,7 +209,7 @@ def node_post():
         node = Node(name=name, color=color)
         db.session.add(node)
         db.session.commit()
-        return graph(), 201
+        return get_graph(), 201
     except Exception as e:
         return f'Sorry, there was an exception: {e}', 501
 
@@ -134,7 +230,7 @@ def node_put(id):
             if '_color' in request.json:
                 node.color = clean(request.json.get('_color') or '') or None
             db.session.commit()
-            return graph(), 200
+            return get_graph(), 200
         else:
             # Create the node
             name = clean(request.json.get('name') or '') or None
@@ -142,7 +238,7 @@ def node_put(id):
             node = Node(id=id, name=name, color=color)
             db.session.add(node)
             db.session.commit()
-            return graph(), 201
+            return get_graph(), 201
     except Exception as e:
         return f'Sorry, there was an exception: {e}', 501
 
@@ -157,7 +253,7 @@ def node_delete(id):
             try:
                 db.session.delete(node)
                 db.session.commit()
-                return graph(), 200
+                return get_graph(), 200
             except Exception as e:
                 return str(e), 501
         return f'There is no node with id={id}. Perhaps it has already been deleted?', 404
@@ -197,7 +293,7 @@ def edge_post():
         color = clean(request.json.get('_color') or '') or None
         db.session.add(Edge(sid=sid, tid=tid, name=name, color=color))
         db.session.commit()
-        return graph(), 201
+        return get_graph(), 201
     except Exception as e:
         return f'Sorry, there was an exception: {e}', 501
 
@@ -222,7 +318,7 @@ def edge_put(id):
             if '_color' in request.json:
                 edge.color = clean(request.json.get('_color') or '') or None
             db.session.commit()
-            return graph(), 200
+            return get_graph(), 200
         else:
             # Create the edge
             if isinstance(request.json.get('sid'), int) and isinstance(request.json.get('tid'), int):
@@ -235,7 +331,7 @@ def edge_put(id):
             edge = Edge(id=id, sid=sid, tid=tid, name=name, color=color)
             db.session.add(edge)
             db.session.commit()
-            return graph(), 201
+            return get_graph(), 201
     except Exception as e:
         return f'Sorry, there was an exception: {e}', 501
 
@@ -250,7 +346,7 @@ def edge_delete(id):
             try:
                 db.session.delete(edge)
                 db.session.commit()
-                return graph(), 200
+                return get_graph(), 200
             except Exception as e:
                 return str(e), 501
         return f'There is no edge with id={id}. Perhaps it has already been deleted?', 404

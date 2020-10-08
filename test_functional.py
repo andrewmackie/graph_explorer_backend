@@ -48,7 +48,7 @@ def return_item_with_id(list_of_dictionaries, id):
 
 
 def test_graph_get(client):
-    response = client.get('/graph')
+    response = client.get('/api/v0/graph')
     assert response.status_code == 200 and \
            len(response.json['nodes']) == 10 and \
            len(response.json['edges']) == 9
@@ -162,3 +162,18 @@ def test_edge_delete(client):
            len(response.json['edges']) == 8 and \
            return_item_with_id(response.json['edges'], 1) == None
 
+
+def test_swag(client):
+    """
+    This test is runs automatically in Travis CI
+
+    :param client: Flask app test client
+    :param specs_data: {'url': {swag_specs}} for every spec in app
+    """
+    specs_data = client.get('/apispec_1.json').json
+    print(specs_data)
+    #for url, spec in specs_data.items():
+    assert 'Node' in specs_data['components']['schemas'] and \
+    'Edge' in specs_data['components']['schemas']
+        # 'route '/colors/<palette>/' becomes '/colors/{palette}/'
+        #assert 'colors' in spec['paths']['/colors/{palette}/']['get']['tags']
