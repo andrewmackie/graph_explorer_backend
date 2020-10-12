@@ -6,6 +6,7 @@ from flask import Flask, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 import os
+import re
 from sqlalchemy.schema import CheckConstraint
 
 app = Flask(__name__)
@@ -138,6 +139,13 @@ class Edge(db.Model):
         return f'<Edge {self.sid} {self.tid}'
 
 
+def valid_color(string):
+    match = re.match('^#?(([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3}))$', string)
+    if match:
+        return f'#{match.group(1)}'
+    return None
+
+
 @app.route('/')
 def welcome():
     return '<p>Welcome to Graph Explorer!</p><p>View the  <a href="/apidocs">API documentation</a>'
@@ -252,7 +260,7 @@ def node_post():
     # Get the data in the request (cleaned to prevent XSS)
     try:
         name = clean(request.json.get('name') or '') or None
-        color = clean(request.json.get('_color') or '') or None
+        color = valid_color(clean(request.json.get('_color') or '') or None)
         # Check whether there's an existing node with this name
         node_existing = db.session.query(Node).filter_by(name=name).first()
         if node_existing:
@@ -313,13 +321,13 @@ def node_put(id):
             if 'name' in request.json:
                 node.name = clean(request.json.get('name') or '') or None
             if '_color' in request.json:
-                node.color = clean(request.json.get('_color') or '') or None
+                node.color = valid_color(clean(request.json.get('_color') or '') or None)
             db.session.commit()
             return get_graph(), 200
         else:
             # Create the node
             name = clean(request.json.get('name') or '') or None
-            color = clean(request.json.get('_color') or '') or None
+            color = valid_color(clean(request.json.get('_color') or '') or None)
             node = Node(id=id, name=name, color=color)
             db.session.add(node)
             db.session.commit()
@@ -445,7 +453,7 @@ def edge_post():
         sid = request.json.get('sid')
         tid = request.json.get('tid')
         name = clean(request.json.get('name') or '') or None
-        color = clean(request.json.get('_color') or '') or None
+        color = valid_color(clean(request.json.get('_color') or '') or None)
         db.session.add(Edge(sid=sid, tid=tid, name=name, color=color))
         db.session.commit()
         return get_graph(), 201
@@ -505,7 +513,7 @@ def edge_put(id):
             if 'name' in request.json:
                 edge.name = clean(request.json.get('name') or '') or None
             if '_color' in request.json:
-                edge.color = clean(request.json.get('_color') or '') or None
+                edge.color = valid_color(clean(request.json.get('_color') or '') or None)
             db.session.commit()
             return get_graph(), 200
         else:
@@ -516,7 +524,7 @@ def edge_put(id):
             else:
                 return 'Sorry, the sid and tid params must be integers.', 400
             name = clean(request.json.get('name') or '') or None
-            color = clean(request.json.get('_color') or '') or None
+            color = valid_color(clean(request.json.get('_color') or '') or None)
             edge = Edge(id=id, sid=sid, tid=tid, name=name, color=color)
             db.session.add(edge)
             db.session.commit()
