@@ -349,7 +349,6 @@ def node_delete(id):
               $ref: '#/components/schemas/graph'
       404:
         description: The node does not exist
-    :return: The entire graph
     """
     try:
         node = db.session.query(Node).filter_by(id=id).first()
@@ -529,7 +528,24 @@ def edge_put(id):
 @app.route('/api/v0/edge/<int:id>', methods=['DELETE'])
 def edge_delete(id):
     """Delete an edge
-    :return: The entire graph
+    ---
+    description: Returns an edge based on id
+    parameters:
+      - name: id
+        in: path
+        description: The integer identifying the edge
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: The edge has been deleted.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/graph'
+      404:
+        description: The edge does not exist
     """
     try:
         edge = db.session.query(Edge).filter_by(id=id).first()
