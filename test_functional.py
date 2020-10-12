@@ -124,6 +124,17 @@ def test_edge_post(client):
     assert new_edge['_color'] == color
 
 
+def test_edge_post_no_other_data(client):
+    response = client.post('/api/v0/edge', json={'sid': sid, 'tid': tid})
+    new_edge = return_item_with_id(response.json['edges'], 10)
+    assert response.status_code == 201
+    assert len(response.json['edges']) == 10
+    assert new_edge['sid'] == sid
+    assert new_edge['tid'] == tid
+    assert new_edge['name'] == None
+    assert new_edge['_color'] == None
+
+
 def test_edge_put(client):
     response = client.put('/api/v0/edge/1', json={'sid': sid, 'tid': tid, 'name': name, '_color': color})
     updated_edge = return_item_with_id(response.json['edges'], 1)
