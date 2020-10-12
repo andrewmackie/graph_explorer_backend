@@ -12,90 +12,90 @@ app = Flask(__name__)
 
 # Use flasgger to automatically render and serve OpenAPI documentation (from comments in each route)
 # Create an APISpec
-template = {
-    'title': 'Graph Explorer REST API',
-    'description': 'A REST API for a graph of nodes and edges.',
-    'version': '0',
-    'contact': {
-      'name': 'Andrew Mackie',
-    },
-    'headers': [
-        ('Access-Control-Allow-Origin', '*'),
-        ('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS'),
-        ('Access-Control-Allow-Credentials', 'true'),
-    ],
-    'components': {
-        'schemas': {
-            'Node': {
-                'type': 'object',
-                'properties': {
-                    'id': {
-                        'type': 'integer',
-                        'required': True,
-                        'description': 'The unique identifier for this node'
-                    },
-                    'name': {
-                        'type': 'string',
-                        'default': None,
-                        'required': False,
-                        'unique': True,
-                        'description': 'An optional and unique string to describe this node'
-                    },
-                    '_color': {
-                        'type': 'string',
-                        'default': None,
-                        'required': False,
-                        'description': "An optional hex color for this node, including the # character (e.g. '#09A2d2')"
-                    },
 
+# swagger config
+app.config['SWAGGER'] = {
+    'openapi': '3.0.3',
+    'uiversion': 3,
+    'specs_route': '/apidocs/'
+}
+
+swagger_template = {
+   "info": {
+      "title": "Graph Explorer REST API",
+      "description": "A REST API for a graph of nodes and edges.",
+      "version": "0"
+    },
+    "contact": {
+      "name": "Andrew Mackie"
+    },
+    "components": {
+        "schemas": {
+            "node": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "required": False,
+                        "title": "An optional and unique string to describe this node"
+                    },
+                    "_color": {
+                        "type": "string",
+                        "required": False,
+                        "title": "An optional hex color for this node, including the # character (e.g. '#09A2d2')"
+                    }
                 }
             },
-            'Edge': {
-                'type': 'object',
-                'properties': {
-                    'id': {
-                        'type': 'integer',
-                        'required': True,
-                        'description': 'The unique identifier for this node'
+            "edge": {
+                "type": "object",
+                "properties": {
+                    "sid": {
+                        "type": "integer",
+                        "required": True,
+                        "description": "The id of the source node (the first node connected by this edge)"
                     },
-                    'sid': {
-                        'type': 'integer',
-                        'required': True,
-                        'description': 'The id of the source node (the first node connected by this edge)'
+                    "tid": {
+                        "type": "integer",
+                        "required": True,
+                        "description": "The id of the target node (the second node connected by this edge)"
                     },
-                    'tid': {
-                        'type': 'integer',
-                        'required': True,
-                        'description': 'The id of the target node (the second node connected by this edge)'
+                    "name": {
+                        "type": "string",
+                        "default": None,
+                        "required": False,
+                        "description": "An optional and unique string to describe this edge"
                     },
-                    'name': {
-                        'type': 'string',
-                        'default': None,
-                        'required': False,
-                        'unique': True,
-                        'description': 'An optional and unique string to describe this edge'
-                    },
-                    '_color': {
-                        'type': 'string',
-                        'default': None,
-                        'required': False,
-                        'description': "An optional hex color for this edge, including the # character (e.g. '#09A2d2')"
-                    },
-
+                    "_color": {
+                        "type": "string",
+                        "default": None,
+                        "required": False,
+                        "description": "An optional hex color for this edge, including the # character (e.g. '#09A2d2')"
+                    }
                 }
-            }
+            },
+            "graph": {
+                "type": "object",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "items": {
+                            '$ref': '#/components/schemas/node'
+                        }
+                    },
+                    "edges": {
+                        "type": "array",
+                        "items": {
+                            '$ref': '#/components/schemas/edge'
+                        }
+                    }
+                }
+            },
+
         }
     }
 }
 
-# swagger config
-app.config['SWAGGER'] = {
-    'title': 'Graph Explorer API',
-    'uiversion': 3,
-    "specs_route": "/apidocs/"
-}
-
-swagger = Swagger(app, template= template)
+swagger = Swagger(app, template=swagger_template)
 
 CORS(app)  # Allow all CORS origins for all routes
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = 'False'
@@ -161,16 +161,16 @@ def get_graph():
 
 @app.route('/api/v0/graph')
 def graph():
-    """Returns the entire graph of nodes and edges
+    """Get the entire graph of nodes and edges
     ---
-    definitions:
-      Node:
-          $ref: '#/components/schemas/Node'
-      Edge:
-          $ref: '#/components/schemas/Edge'
+    description: Returns all nodes and edges in the database
     responses:
       200:
-        description: Returns the entire graph (all nodes and all edges in the database)
+        description: An object containing a list of nodes and ed.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/graph'
     """
     if request.method == 'OPTIONS':
         # This is a CORS preflight request
@@ -178,9 +178,32 @@ def graph():
     return get_graph(), 200
 
 
+@app.route('/api/v0/node/<int:id>', methods=['GET'])
 def node_get(id):
-    """Read a node
-    :return: The node's data
+    """Get a node
+    ---
+    description: Returns a node based on id
+    parameters:
+      - name: id
+        in: path
+        description: The integer identifying the node
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: The data for this node
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/node'
+      404:
+        description: The node does not exist
+        content:
+          text/plain:
+            schema:
+              type: string
+
     """
     try:
         node = db.session.query(Node).filter_by(id=id).first()
@@ -191,11 +214,39 @@ def node_get(id):
         return f'Sorry, there was an exception: {e}', 501
 
 
-# These functions are separated from the API routes in order to make them reusable.
-# (i.e. the Flask routes become an API wrapper for these functions)
+@app.route('/api/v0/node', methods=['POST'])
 def node_post():
     """Create a new node
-    :return: The entire graph
+    ---
+    description: Create a new node
+    requestBody:
+      description: Optional data describing the new node
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/node'
+    responses:
+      201:
+        description: The node has successfully been created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/graph'
+
+      400:
+        description: A node with the same name already exists.
+        content:
+          text/plain:
+            schema:
+              type: string
+      501:
+        description: Internal server error.
+        content:
+          text/plain:
+            schema:
+              type: string
+
     """
     # Clean the posted data to prevent XSS
     # Get the data in the request (cleaned to prevent XSS)
@@ -214,10 +265,44 @@ def node_post():
         return f'Sorry, there was an exception: {e}', 501
 
 
+@app.route('/api/v0/node/<int:id>', methods=['PUT'])
 def node_put(id):
     """Update or create a node.
-    In this demo, there is no provision for updating the Postgres sequence id if records are created here.
-    :return: The entire graph
+    ---
+    description: Update or create a node with a specific id.
+    parameters:
+      - name: id
+        in: path
+        description: The integer identifying the node
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      description: Optional data describing the new node
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/node'
+    responses:
+      200:
+        description: The node has successfully been updated.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/graph'
+      201:
+        description: The node has successfully been created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/graph'
+      501:
+        description: Internal server error.
+        content:
+          text/plain:
+            schema:
+              type: string
     """
     # Get the data in the request (cleaned to prevent XSS)
     try:
@@ -243,8 +328,27 @@ def node_put(id):
         return f'Sorry, there was an exception: {e}', 501
 
 
+@app.route('/api/v0/node/<int:id>', methods=['DELETE'])
 def node_delete(id):
     """Delete a node
+    ---
+    description: Returns a node based on id
+    parameters:
+      - name: id
+        in: path
+        description: The integer identifying the node
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: The node has been deleted.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/graph'
+      404:
+        description: The node does not exist
     :return: The entire graph
     """
     try:
@@ -261,9 +365,31 @@ def node_delete(id):
         return f'Sorry, there was an exception: {e}', 501
 
 
+@app.route('/api/v0/edge/<int:id>', methods=['GET'])
 def edge_get(id):
-    """Read a edge
-    :return: The edge
+    """Get an edge
+    ---
+    description: Returns an edge based on id
+    parameters:
+      - name: id
+        in: path
+        description: The integer identifying the edge
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: The data for this edge
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/edge'
+      404:
+        description: The edge does not exist
+        content:
+          text/plain:
+            schema:
+              type: string
     """
     try:
         edge = db.session.query(Edge).filter_by(id=id).first()
@@ -280,9 +406,39 @@ def edge_get(id):
         return f'Sorry, there was an exception: {e}', 501
 
 
+@app.route('/api/v0/edge', methods=['POST'])
 def edge_post():
     """Create a new edge
-    :return: The entire graph
+    ---
+    description: Create a new edge
+    requestBody:
+      description: Optional data describing the new edge
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/edge'
+    responses:
+      201:
+        description: The edge has successfully been created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/graph'
+
+      400:
+        description: An edge with the same name already exists.
+        content:
+          text/plain:
+            schema:
+              type: string
+      501:
+        description: Internal server error.
+        content:
+          text/plain:
+            schema:
+              type: string
+
     """
     # Clean the posted data to prevent XSS
     # Get the data in the request (cleaned to prevent XSS)
@@ -298,10 +454,44 @@ def edge_post():
         return f'Sorry, there was an exception: {e}', 501
 
 
+@app.route('/api/v0/edge/<int:id>', methods=['PUT'])
 def edge_put(id):
-    """Update or create a edge.
-    In this demo, there is no provision for updating the Postgres sequence id if records are created here.
-    :return: The entire graph
+    """Update or create an edge.
+    ---
+    description: Update or create an edge with a specific id.
+    parameters:
+      - name: id
+        in: path
+        description: The integer identifying the edge
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      description: Optional data describing the new edge
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/edge'
+    responses:
+      200:
+        description: The edge has successfully been updated.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/graph'
+      201:
+        description: The edge has successfully been created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/graph'
+      501:
+        description: Internal server error.
+        content:
+          text/plain:
+            schema:
+              type: string
     """
     # Get the data in the request (cleaned to prevent XSS)
     try:
@@ -336,6 +526,7 @@ def edge_put(id):
         return f'Sorry, there was an exception: {e}', 501
 
 
+@app.route('/api/v0/edge/<int:id>', methods=['DELETE'])
 def edge_delete(id):
     """Delete an edge
     :return: The entire graph
@@ -354,48 +545,14 @@ def edge_delete(id):
         return f'Sorry, there was an exception: {e}', 501
 
 
-# The routes (API wrappers) for the above functions
-
-@app.route('/api/v0/<noun>', methods=['POST'])
-def api_post(noun):
-    """Define the Create function of the API
+@app.route('/api/v0/<noun>', methods=['OPTIONS'])
+@app.route('/api/v0/<noun>/<int:id>', methods=['OPTIONS'])
+def api_cors_preflight(noun, id):
+    """For performance, return empty responses to CORS preflight requests (to avoid database calls)
     :return:
     """
-    if request.method == 'OPTIONS':
-        # This is a CORS preflight request
+    if noun in ['node', 'edge']:
         return {}, 200
-    if noun == 'node':
-        return node_post()
-    if noun == 'edge':
-       return edge_post()
-    # The noun is unsupported
-    return f'Sorry, the noun \'{noun}\' is not supported by this API.', 404
-
-
-@app.route('/api/v0/<noun>/<int:id>', methods=['GET', 'PUT', 'DELETE'])
-def api_get_put_delete(noun, id):
-    """Define the Read, Update and Delete functions of the API
-    :return:
-    """
-    if request.method == 'OPTIONS':
-        # This is a CORS preflight request
-        return {}, 200
-    if noun == 'node':
-        if request.method == 'GET':
-            return node_get(id)
-        if request.method == 'PUT':
-            return node_put(id)
-        if request.method == 'DELETE':
-            return node_delete(id)
-    if noun == 'edge':
-        if request.method == 'GET':
-           return edge_get(id)
-        if request.method == 'PUT':
-           return edge_put(id)
-        if request.method == 'DELETE':
-           return edge_delete(id)
-    # The noun is unsupported
-    return f'Sorry, the noun \'{noun}\' is not supported by this API.', 404
 
 
 if __name__ == '__main__':
