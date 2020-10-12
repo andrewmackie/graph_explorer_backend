@@ -131,8 +131,8 @@ def test_edge_post_no_other_data(client):
     assert len(response.json['edges']) == 10
     assert new_edge['sid'] == sid
     assert new_edge['tid'] == tid
-    assert new_edge['name'] == None
-    assert new_edge['_color'] == None
+    assert new_edge['name'] is None
+    assert new_edge['_color'] is None
 
 
 def test_edge_put(client):
